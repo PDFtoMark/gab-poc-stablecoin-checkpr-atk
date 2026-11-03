@@ -1,0 +1,40 @@
+name: Check PR
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  checks: write
+  contents: write
+  actions: read
+
+jobs:
+  post_run_hardhat_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: junit-report-*
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish combined test report
+        uses: mikepenz/action-junit-report@v4
+        with:
+          check_name: upload_test_results
+          job_summary: true
+          detailed_summary: true
+          commit: ${{ github.event.workflow_run.head_sha }}
+          report_paths: "./junit-report-*/junit.xml"
+
+      - name: Verify (PoC only; not present in target)
+        if: always()
+        run: |
+          echo "--- MARKER.txt in workspace ---"
+          cat MARKER.txt || echo NO_MARKER
+          echo "--- /home/runner/work/PWNED_RCE.txt ---"
+          cat /home/runner/work/PWNED_RCE.txt || echo NO_RCE_MARKER
+          echo "--- hijacked action bundle (first lines) ---"
+          head -3 /home/runner/work/_actions/mikepenz/action-junit-report/v4/dist/index.js || echo NO_BUNDLE
